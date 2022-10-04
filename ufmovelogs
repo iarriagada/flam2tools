@@ -1,0 +1,61 @@
+#!/bin/bash
+#
+# ufmovelogs -- Log Dir Cleanup. Move logs to backup folder
+#
+# Author: Ignacio Arriagada
+# Date: 2021/05/11
+#
+unalias -a 
+
+# Directories and execution log
+logdir="/var/tmp"
+budir="/data/backup"
+mvlog="ufmovelogs.log"
+
+# Check if log dir exists
+if [[ -d ${logdir} ]]
+then
+    pushd ${logdir} >& /dev/null
+else
+    echo "${logdir} not found or is not a directory"
+    exit 1
+fi
+
+# Register execution date and fill arrays
+opdate=`date +"%Y%m%d-%H:%M:%S"`
+recentlogs=(`/share/local/ufflam/scripts/ufrecentlogs`)
+alllogs=(`ls`)
+
+echo "Executing Log Dir Cleanup" | tee -a ${budir}/${mvlog}
+echo ${opdate}  >> ${budir}/${mvlog}  
+dspace=(`du -h .`)
+echo "Disk space used, before move: ${dspace[0]}" | tee -a ${budir}/${mvlog}
+echo '' | tee -a ${budir}/${mvlog}
+
+echo "Moving files not in use" | tee -a ${budir}/${mvlog}
+
+for file in ${alllogs[@]}
+do
+    fsize=(`du -h ${file}`)
+    # Register length of recentlogs array
+    lenrl=${#recentlogs[@]}
+    # Create aux array with current file removed if in recentlogs
+    # then calculate length
+    aux=(${recentlogs[@]/$file})
+    lenaux=${#aux[@]}
+    # If aux length equal to recentlogs, don't move file
+    if [[ $lenaux != $lenrl ]]
+    then
+        recentlogs=(${aux[@]})
+        echo "Skipping ${file}, size ${fsize[0]}: file is a recent log" >> ${budir}/${mvlog}
+        continue
+    fi
+    #echo "mv ${file} ${budir}"
+    mv ${file} ${budir}
+    echo "Moving ${file}, size ${fsize[0]}" >> ${budir}/${mvlog}
+done
+
+dspace=(`du -h .`)
+echo "Disk space used, after move: ${dspace[0]}" | tee -a ${budir}/${mvlog}
+echo '' >> ${budir}/${mvlog}
+echo "Done!"
